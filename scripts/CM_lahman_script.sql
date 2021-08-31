@@ -183,3 +183,178 @@ SELECT ROUND(CAST(COUNT(*) AS numeric)/46, 2)
 FROM best_record_ws_winners
 
 -- percentage of most win world series winners
+
+-- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). 
+-- Only consider parks where there were at least 10 games played. 
+-- Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+SELECT p.park_name, h.team, h.attendance/h.games AS avg_attendance
+FROM homegames AS h
+INNER JOIN parks AS p
+ON h.park = p.park
+WHERE year = '2016'
+AND h.games >= 10
+ORDER BY avg_attendance DESC
+LIMIT 5;
+
+-- highest average attendance
+
+SELECT p.park_name, h.team, h.attendance/h.games AS avg_attendance
+FROM homegames AS h
+INNER JOIN parks AS p
+ON h.park = p.park
+WHERE year = '2016'
+AND h.games >= 10
+ORDER BY avg_attendance ASC
+LIMIT 5;
+
+-- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
+-- Give their full name and the teams that they were managing when they won the award.
+
+WITH al_tsn AS
+(SELECT a.playerid, a.yearid, m.teamid
+FROM awardsmanagers AS a
+INNER JOIN people AS p
+ON a.playerid = p.playerid
+INNER JOIN managers AS m
+ON a.playerid = m.playerid
+WHERE a.awardid = 'TSN Manager of the Year'
+AND a.lgid = 'AL'
+AND a.yearid = m.yearid
+GROUP BY a.playerid, a.yearid, m.teamid),
+
+nl_tsn AS
+(SELECT a.playerid, a.yearid, m.teamid
+FROM awardsmanagers AS a
+INNER JOIN people AS p
+ON a.playerid = p.playerid
+INNER JOIN managers AS m
+ON a.playerid = m.playerid
+WHERE a.awardid = 'TSN Manager of the Year'
+AND a.lgid = 'NL'
+AND a.yearid = m.yearid
+GROUP BY a.playerid, a.yearid, m.teamid)
+
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, n.yearid, n.teamid, a.yearid, a.teamid
+FROM nl_tsn AS n
+INNER JOIN al_tsn AS a
+ON n.playerid = a.playerid
+INNER JOIN people AS p
+ON n.playerid = p.playerid
+GROUP BY fullname, n.yearid, n.teamid, a.yearid, a.teamid
+
+-- 10. Analyze all the colleges in the state of Tennessee. 
+-- Which college has had the most success in the major leagues. 
+-- Use whatever metric for success you like - number of players, number of games, salaries, world series wins, etc.
+
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, sc.schoolname, SUM(s.salary) AS total_salary
+FROM people AS p
+LEFT JOIN collegeplaying AS c
+ON p.playerid = c.playerid
+LEFT JOIN schools AS sc
+ON c.schoolid = sc.schoolid
+LEFT JOIN salaries AS s
+ON p.playerid = s.playerid
+WHERE sc.schoolstate = 'TN'
+AND salary IS NOT NULL
+GROUP BY fullname, sc.schoolname
+ORDER BY total_salary DESC;
+
+-- highest paid player from tennessee colleges
+
+SELECT sc.schoolname, SUM(s.salary) AS total_salary
+FROM people AS p
+LEFT JOIN collegeplaying AS c
+ON p.playerid = c.playerid
+LEFT JOIN schools AS sc
+ON c.schoolid = sc.schoolid
+LEFT JOIN salaries AS s
+ON p.playerid = s.playerid
+WHERE sc.schoolstate = 'TN'
+AND salary IS NOT NULL
+GROUP BY sc.schoolname
+ORDER BY total_salary DESC;
+
+-- highest total salary by college
+
+SELECT sc.schoolname, COUNT(distinct p.playerid) AS number_players 
+FROM people AS p
+LEFT JOIN collegeplaying AS c
+ON p.playerid = c.playerid
+LEFT JOIN schools AS sc
+ON c.schoolid = sc.schoolid
+LEFT JOIN salaries AS s
+ON p.playerid = s.playerid
+WHERE sc.schoolstate = 'TN'
+GROUP BY sc.schoolname
+ORDER BY number_players DESC;
+
+-- most players by school 
+
+SELECT sc.schoolname, ROUND(CAST(SUM(s.salary) AS numeric)/CAST(COUNT(distinct p.playerid) AS numeric), 0) AS avg_salary
+FROM people AS p
+LEFT JOIN collegeplaying AS c
+ON p.playerid = c.playerid
+LEFT JOIN schools AS sc
+ON c.schoolid = sc.schoolid
+LEFT JOIN salaries AS s
+ON p.playerid = s.playerid
+WHERE sc.schoolstate = 'TN'
+AND salary IS NOT NULL
+GROUP BY sc.schoolname
+HAVING COUNT(p.playerid) >= 15
+ORDER BY avg_salary DESC;
+
+-- average salary of players from colleges with more than 15 MLB players
+
+SELECT sc.schoolname, COUNT(distinct ap.playerid) AS number_players
+FROM appearances AS ap
+LEFT JOIN collegeplaying AS c
+ON ap.playerid = c.playerid
+LEFT JOIN schools AS sc
+ON c.schoolid = sc.schoolid
+LEFT JOIN teams AS t
+ON ap.teamid = t.teamid
+WHERE sc.schoolstate = 'TN'
+AND wswin = 'Y'
+AND ap.yearid = t.yearid
+GROUP BY sc.schoolname
+ORDER BY number_players DESC;
+
+-- number of world series winners by college
+
+-- not sure if above queries worked - recheck
+
+-- 11. Is there any correlation between number of wins and team salary?
+-- Use data from 2000 and later to answer this question. 
+-- As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
+
+SELECT t.name, t.yearid, t.w, SUM(s.salary) As total_salary
+FROM salaries AS s
+LEFT JOIN teams as t 
+ON s.teamid = t.teamid
+AND s.yearid = t.yearid
+WHERE t.yearid >= '2000'
+GROUP BY t.name, t.yearid, t.w
+ORDER BY t.yearid DESC, total_salary DESC
+
+-- basic query showing teams wins and salary by year
+-- ran correlation and regression. short answer: not really. long answer: used to matter more, but the correlation has lessened over the last decade.
+
+-- 12. In this question, you will explore the connection between number of wins and attendance.
+-- a. Does there appear to be any correlation between attendance at home games and number of wins?
+-- b. Do teams that win the world series see a boost in attendance the following year? What about teams that made the playoffs? Making the playoffs means either being a division winner or a wild card winner.
+
+SELECT t.yearid, t.name, t.w, h.attendance
+FROM teams AS t
+LEFT JOIN homegames AS h
+ON t.teamid = h.team
+AND t.yearid = h.year
+WHERE t.yearid >= '1950'
+ORDER BY t.yearid DESC, h.attendance DESC
+
+-- once again, correlation shows attendance and home games used to correlate with each other much more than they do in the modern day
+
+
+
+
