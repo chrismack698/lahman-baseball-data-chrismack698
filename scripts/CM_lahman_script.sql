@@ -116,10 +116,10 @@ FROM teams
 WHERE w = 
 	(SELECT MAX(w)
 	FROM teams
-	WHERE wswin = 'Y')
+	WHERE wswin = 'N')
 AND yearid BETWEEN '1970' AND '2016';
 
--- largest number of wins
+-- largest number of wins with no WS
 
 SELECT yearid, name, w
 FROM teams
@@ -323,7 +323,18 @@ ORDER BY number_players DESC;
 
 -- number of world series winners by college
 
--- not sure if above queries worked - recheck
+SELECT sc.schoolname, COUNT(distinct c.playerid) AS number_players_awards
+FROM collegeplaying AS c
+LEFT JOIN awardsplayers AS a
+ON c.playerid = a.playerid
+LEFT JOIN schools AS sc
+ON c.schoolid = sc.schoolid
+WHERE sc.schoolstate = 'TN'
+AND awardid IS NOT NULL
+GROUP BY sc.schoolname
+ORDER BY number_players_awards DESC;
+
+-- awards by school
 
 -- 11. Is there any correlation between number of wins and team salary?
 -- Use data from 2000 and later to answer this question. 
@@ -356,5 +367,101 @@ ORDER BY t.yearid DESC, h.attendance DESC
 -- once again, correlation shows attendance and home games used to correlate with each other much more than they do in the modern day
 
 
+SELECT park, yearid, name, wswin, attendance,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) AS attendance_nxt_year,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) - attendance AS change_in_attendance
+FROM teams
+WHERE yearid >= '1920'
+AND wswin IS NOT NULL
+ORDER BY wswin DESC, yearid DESC
+LIMIT 96
 
+-- world series winners attendance
 
+SELECT ROUND(AVG(change_in_attendance), 2)
+FROM (SELECT park, yearid, name, wswin, attendance,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) AS attendance_nxt_year,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) - attendance AS change_in_attendance
+FROM teams
+WHERE yearid >= '1920'
+AND wswin IS NOT NULL
+ORDER BY wswin DESC, yearid DESC
+LIMIT 96) subquery
+
+-- avg change in attendance
+
+SELECT park, yearid, name, wcwin, divwin, attendance,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) AS attendance_nxt_year,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) - attendance AS change_in_attendance
+FROM teams
+WHERE yearid >= '1920'
+AND divwin IS NOT NULL
+ORDER BY divwin DESC, wcwin DESC, yearid DESC
+
+-- div and wc winners
+
+SELECT ROUND(AVG(change_in_attendance),2)
+FROM (SELECT park, yearid, name, wcwin, divwin, attendance,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) AS attendance_nxt_year,
+LEAD(attendance) OVER (PARTITION BY franchid ORDER BY yearid) - attendance AS change_in_attendance
+FROM teams
+WHERE yearid >= '1920'
+AND divwin IS NOT NULL
+ORDER BY divwin DESC, wcwin DESC, yearid DESC) subquery
+WHERE wcwin = 'Y'
+OR divwin = 'Y'
+
+-- change in attendance if make playoff
+
+-- It is thought that since left-handed pitchers are more rare, causing batters to face them less often, that they are more effective. 
+-- Investigate this claim and present evidence to either support or dispute this claim. 
+-- First, determine just how rare left-handed pitchers are compared with right-handed pitchers. 
+-- Are left-handed pitchers more likely to win the Cy Young Award? 
+-- Are they more likely to make it into the hall of fame?
+
+SELECT p.throws, COUNT(distinct pi.playerid)
+FROM pitching AS pi
+INNER JOIN people AS p
+ON pi.playerid = p.playerid
+WHERE throws IS NOT NULL
+GROUP BY p.throws
+
+-- RHP vs. LHP
+
+SELECT p.throws, COUNT(distinct pi.playerid)
+FROM pitching AS pi
+INNER JOIN people AS p
+ON pi.playerid = p.playerid
+INNER JOIN awardsplayers AS a
+ON pi.playerid = a.playerid
+AND awardid = 'Cy Young Award'
+GROUP BY p.throws
+
+-- cy youngs by throwing arm
+
+SELECT p.throws, COUNT(distinct pi.playerid)
+FROM pitching AS pi
+INNER JOIN people AS p
+ON pi.playerid = p.playerid
+INNER JOIN halloffame AS h
+ON pi.playerid = h.playerid
+AND inducted = 'Y'
+GROUP BY p.throws
+
+-- HOF by throwing arm
+
+SELECT p.throws, ROUND(AVG(pi.w), 2) AS avg_wins,
+ROUND(AVG(CAST(pi.ERA AS numeric)), 2) AS avg_era, 
+ROUND(CAST(SUM(pi.so) AS numeric)/CAST(SUM(pi.g) AS numeric),2) AS avg_so_9, 
+ROUND(CAST(SUM(pi.bb) AS numeric)/CAST(SUM(pi.g) AS numeric),2) AS avg_bb_9,
+ROUND(CAST(SUM(pi.so) AS numeric)/CAST(SUM(pi.g) AS numeric),2) - ROUND(CAST(SUM(pi.bb) AS numeric)/CAST(SUM(pi.g) AS numeric),2) AS avg_k_minus_bb
+FROM pitching AS pi
+INNER JOIN people AS p
+ON pi.playerid = p.playerid
+WHERE g >= 15
+AND yearid >= 1960
+AND throws IS NOT NULL
+GROUP BY throws
+
+-- historical averages post 1970
+-- seems to indicate little to no difference historically. perhaps elite LHP > elite RHP?
