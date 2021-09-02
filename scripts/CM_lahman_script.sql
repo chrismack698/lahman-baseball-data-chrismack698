@@ -350,7 +350,20 @@ GROUP BY t.name, t.yearid, t.w
 ORDER BY t.yearid DESC, total_salary DESC
 
 -- basic query showing teams wins and salary by year
--- ran correlation and regression. short answer: not really. long answer: used to matter more, but the correlation has lessened over the last decade.
+WITH team_wins_salaries AS
+(SELECT t.name, t.yearid, t.w, SUM(s.salary) As total_salary
+FROM salaries AS s
+LEFT JOIN teams as t 
+ON s.teamid = t.teamid
+AND s.yearid = t.yearid
+WHERE t.yearid >= '2000'
+GROUP BY t.name, t.yearid, t.w
+ORDER BY t.yearid DESC, total_salary DESC)
+
+SELECT corr(w, total_salary)
+FROM team_wins_salaries
+
+-- ran regression in excel. short answer: not really. long answer: used to matter more, but the correlation has lessened over the last decade.
 
 -- 12. In this question, you will explore the connection between number of wins and attendance.
 -- a. Does there appear to be any correlation between attendance at home games and number of wins?
@@ -363,6 +376,20 @@ ON t.teamid = h.team
 AND t.yearid = h.year
 WHERE t.yearid >= '1950'
 ORDER BY t.yearid DESC, h.attendance DESC
+
+-- basic query
+
+WITH team_wins_attendance AS
+(SELECT t.yearid, t.name, t.w, h.attendance
+FROM teams AS t
+LEFT JOIN homegames AS h
+ON t.teamid = h.team
+AND t.yearid = h.year
+WHERE t.yearid >= '1950'
+ORDER BY t.yearid DESC, h.attendance DESC)
+
+SELECT corr(w, attendance)
+FROM team_wins_attendance
 
 -- once again, correlation shows attendance and home games used to correlate with each other much more than they do in the modern day
 
