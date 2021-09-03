@@ -22,7 +22,7 @@ LIMIT 1;
 --Sort this list in descending order by the total salary earned. 
 -- Which Vanderbilt player earned the most money in the majors?
 
-SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, SUM(s.salary::numeric::money) AS total_salary
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, SUM(distinct salary::numeric::money) AS total_salary
 FROM people AS p
 LEFT JOIN collegeplaying AS c
 ON p.playerid = c.playerid
@@ -40,8 +40,7 @@ ORDER BY total_salary DESC;
 -- Determine the number of putouts made by each of these three groups in 2016.
 
 SELECT CASE WHEN pos = 'OF' THEN 'Outfield'
-WHEN pos = 'P' THEN 'Battery'
-WHEN pos = 'C' THEN 'Battery'
+WHEN pos IN ('P', 'C') THEN 'Battery'
 ELSE 'Infield' END AS position, SUM(po) as total_putouts
 FROM fielding
 WHERE yearid = '2016'
@@ -52,45 +51,13 @@ ORDER BY total_putouts DESC;
 -- Round the numbers you report to 2 decimal places. 
 -- Do the same for home runs per game. Do you see any trends?
 
-SELECT
-CASE WHEN yearid BETWEEN '1920' AND '1929' THEN '1920s'
-WHEN yearid BETWEEN '1930' AND '1939' THEN '1930s'
-WHEN yearid BETWEEN '1940' AND '1949' THEN '1940s'
-WHEN yearid BETWEEN '1950' AND '1959' THEN '1950s'
-WHEN yearid BETWEEN '1960' AND '1969' THEN '1960s'
-WHEN yearid BETWEEN '1970' AND '1979' THEN '1970s'
-WHEN yearid BETWEEN '1980' AND '1989' THEN '1980s'
-WHEN yearid BETWEEN '1990' AND '1999' THEN '1990s'
-WHEN yearid BETWEEN '2000' AND '2009' THEN '2000s'
-WHEN yearid BETWEEN '2010' AND '2016' THEN '2010s'
-ELSE '1919-beyond'
-END AS decade,
-ROUND(CAST(SUM(so) AS numeric)/CAST(SUM(g) AS numeric),2) AS avg_so_9
-FROM teams
-GROUP BY decade
-ORDER BY decade DESC;
-
--- for strikeouts
-
-SELECT
-CASE WHEN yearid BETWEEN '1920' AND '1929' THEN '1920s'
-WHEN yearid BETWEEN '1930' AND '1939' THEN '1930s'
-WHEN yearid BETWEEN '1940' AND '1949' THEN '1940s'
-WHEN yearid BETWEEN '1950' AND '1959' THEN '1950s'
-WHEN yearid BETWEEN '1960' AND '1969' THEN '1960s'
-WHEN yearid BETWEEN '1970' AND '1979' THEN '1970s'
-WHEN yearid BETWEEN '1980' AND '1989' THEN '1980s'
-WHEN yearid BETWEEN '1990' AND '1999' THEN '1990s'
-WHEN yearid BETWEEN '2000' AND '2009' THEN '2000s'
-WHEN yearid BETWEEN '2010' AND '2016' THEN '2010s'
-ELSE '1919-beyond'
-END AS decade,
+SELECT yearid/10*10 AS decade,
+ROUND (CAST(SUM(so) AS numeric)/CAST(SUM(g) AS numeric),2) AS avg_so_9,
 ROUND(CAST(SUM(hr) AS numeric)/CAST(SUM(g) AS numeric),2) AS avg_hr_9
 FROM teams
+WHERE yearid/10*10 >= 1920
 GROUP BY decade
 ORDER BY decade DESC;
-
--- for homeruns
 
 -- 6. Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. 
 -- (A stolen base attempt results either in a stolen base or being caught stealing.) 
