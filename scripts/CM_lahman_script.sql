@@ -7,7 +7,7 @@ FROM homegames;
 -- How many games did he play in? What is the name of the team for which he played?
 
 
-SELECT p.namefirst, p.namelast, p.height, t.name, a.g_all AS appearances 
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, p.height, t.name, a.g_all AS appearances 
 FROM people AS p
 LEFT JOIN appearances AS a
 ON p.playerid = a.playerid
@@ -22,7 +22,7 @@ LIMIT 1;
 --Sort this list in descending order by the total salary earned. 
 -- Which Vanderbilt player earned the most money in the majors?
 
-SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, SUM(s.salary) AS total_salary
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, SUM(s.salary::numeric::money) AS total_salary
 FROM people AS p
 LEFT JOIN collegeplaying AS c
 ON p.playerid = c.playerid
@@ -152,7 +152,7 @@ FROM teams
 WHERE yearid BETWEEN '1970' AND '2016'
 GROUP BY yearid)
 
-SELECT m.yearid, w.w
+SELECT m.yearid, w.name, w.w
 FROM max_wins AS m
 INNER JOIN world_series_winners AS w
 ON m.yearid = w.yearid
@@ -179,7 +179,7 @@ INNER JOIN world_series_winners AS w
 ON m.yearid = w.yearid
 AND m.max = w.w)
 
-SELECT ROUND(CAST(COUNT(*) AS numeric)/46, 2)
+SELECT ROUND(CAST(COUNT(*) AS numeric)/CAST(46 AS numeric), 2) AS percentage_wins_ws
 FROM best_record_ws_winners
 
 -- percentage of most win world series winners
@@ -247,7 +247,7 @@ GROUP BY fullname, n.yearid, n.teamid, a.yearid, a.teamid
 -- Which college has had the most success in the major leagues. 
 -- Use whatever metric for success you like - number of players, number of games, salaries, world series wins, etc.
 
-SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, sc.schoolname, SUM(s.salary) AS total_salary
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, sc.schoolname, SUM(s.salary::numeric::money) AS total_salary
 FROM people AS p
 LEFT JOIN collegeplaying AS c
 ON p.playerid = c.playerid
@@ -262,7 +262,7 @@ ORDER BY total_salary DESC;
 
 -- highest paid player from tennessee colleges
 
-SELECT sc.schoolname, SUM(s.salary) AS total_salary
+SELECT sc.schoolname, SUM(s.salary::numeric::money) AS total_salary
 FROM people AS p
 LEFT JOIN collegeplaying AS c
 ON p.playerid = c.playerid
@@ -291,7 +291,7 @@ ORDER BY number_players DESC;
 
 -- most players by school 
 
-SELECT sc.schoolname, ROUND(CAST(SUM(s.salary) AS numeric)/CAST(COUNT(distinct p.playerid) AS numeric), 0) AS avg_salary
+SELECT sc.schoolname, ROUND(SUM(s.salary::numeric)/CAST(COUNT(distinct p.playerid) AS numeric), 0) AS avg_salary
 FROM people AS p
 LEFT JOIN collegeplaying AS c
 ON p.playerid = c.playerid
@@ -302,10 +302,10 @@ ON p.playerid = s.playerid
 WHERE sc.schoolstate = 'TN'
 AND salary IS NOT NULL
 GROUP BY sc.schoolname
-HAVING COUNT(p.playerid) >= 15
+HAVING COUNT(distinct p.playerid) >= 5
 ORDER BY avg_salary DESC;
 
--- average salary of players from colleges with more than 15 MLB players
+-- average salary of players from colleges with more than 5 paid MLB players
 
 SELECT sc.schoolname, COUNT(distinct ap.playerid) AS number_players
 FROM appearances AS ap
@@ -340,7 +340,7 @@ ORDER BY number_players_awards DESC;
 -- Use data from 2000 and later to answer this question. 
 -- As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
 
-SELECT t.name, t.yearid, t.w, SUM(s.salary) As total_salary
+SELECT t.name, t.yearid, t.w, SUM(s.salary::numeric::money) As total_salary
 FROM salaries AS s
 LEFT JOIN teams as t 
 ON s.teamid = t.teamid
@@ -350,6 +350,7 @@ GROUP BY t.name, t.yearid, t.w
 ORDER BY t.yearid DESC, total_salary DESC
 
 -- basic query showing teams wins and salary by year
+
 WITH team_wins_salaries AS
 (SELECT t.name, t.yearid, t.w, SUM(s.salary) As total_salary
 FROM salaries AS s
@@ -363,7 +364,7 @@ ORDER BY t.yearid DESC, total_salary DESC)
 SELECT corr(w, total_salary)
 FROM team_wins_salaries
 
--- ran regression in excel. short answer: not really. long answer: used to matter more, but the correlation has lessened over the last decade.
+-- ran regression in excel, too. R2: 0.1171, so short answer: not really. long answer: used to matter more, but the correlation has lessened over the last decade.
 
 -- 12. In this question, you will explore the connection between number of wins and attendance.
 -- a. Does there appear to be any correlation between attendance at home games and number of wins?
@@ -391,7 +392,7 @@ ORDER BY t.yearid DESC, h.attendance DESC)
 SELECT corr(w, attendance)
 FROM team_wins_attendance
 
--- once again, correlation shows attendance and home games used to correlate with each other much more than they do in the modern day
+-- regression R2: 0.1513. once again, correlation shows attendance and home games used to correlate with each other much more than they do in the modern day
 
 
 SELECT park, yearid, name, wswin, attendance,
@@ -489,6 +490,30 @@ WHERE g >= 15
 AND yearid >= 1960
 AND throws IS NOT NULL
 GROUP BY throws
+ORDER BY avg_wins DESC
 
--- historical averages post 1970
+-- historical averages post 1960
 -- seems to indicate little to no difference historically. perhaps elite LHP > elite RHP?
+
+WITH bins AS 
+(SELECT generate_series(.50, 13.50, 0.5) AS lower,
+generate_series(1.00, 14.00, 0.5) AS upper),
+
+pitchers AS 
+(SELECT p.throws, pi.era
+FROM pitching AS pi
+INNER JOIN people AS p
+ON pi.playerid = p.playerid
+WHERE g >= 25
+AND yearid >= 1960
+AND throws IS NOT NULL
+GROUP BY throws, pi.era)
+
+SELECT p.throws, lower, upper, COUNT(p.era)
+FROM pitchers AS p
+LEFT JOIN bins 
+ON p.era >= lower
+AND p.era < upper
+GROUP BY lower, upper, p.throws
+
+
