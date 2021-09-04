@@ -214,7 +214,7 @@ GROUP BY fullname, n.yearid, n.teamid, a.yearid, a.teamid
 -- Which college has had the most success in the major leagues. 
 -- Use whatever metric for success you like - number of players, number of games, salaries, world series wins, etc.
 
-SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, sc.schoolname, SUM(s.salary::numeric::money) AS total_salary
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, sc.schoolname, SUM(distinct s.salary::numeric::money) AS total_salary
 FROM people AS p
 LEFT JOIN collegeplaying AS c
 ON p.playerid = c.playerid
